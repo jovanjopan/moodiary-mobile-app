@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/home_screen.dart';
 import 'screens/journal_list_screen.dart';
-import 'screens/trends_screen.dart'; // ✅ import baru
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
+import 'screens/counselor_screen.dart';
+import 'screens/profile_screen.dart';
+// import 'screens/trends_screen.dart';
+import 'screens/splash_screen.dart'; // ✅ Import Splash
 
 Future<void> main() async {
-  // 🧠 Wajib dipanggil karena dotenv membutuhkan inisialisasi async
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 🔒 Load file .env dari root proyek
-  await dotenv.load(fileName: ".env");
-
-  // 🚀 Jalankan aplikasi
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    print("Warning: .env not found");
+  }
   runApp(const MoodiaryApp());
 }
 
@@ -32,11 +33,13 @@ class MoodiaryApp extends StatelessWidget {
           secondary: Color(0xFF03DAC6),
         ),
       ),
-      home: const MainPage(),
+      home: const SplashScreen(), // ✅ Mulai dari sini
     );
   }
 }
 
+// 🏠 MAIN PAGE UTAMA (Wadah Bottom Navigation)
+// Ini dipanggil setelah Login/Register sukses
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -50,7 +53,8 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _screens = const [
     HomeScreen(),
     JournalListScreen(),
-    TrendsScreen(), // ✅ page baru
+    CounselorScreen(),
+    ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -62,23 +66,33 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF1E1E1E),
-        selectedItemColor: const Color(0xFFBB86FC),
-        unselectedItemColor: Colors.grey,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Journal'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.show_chart),
-            label: 'Trends',
-          ),
-        ],
+      body: IndexedStack(index: _selectedIndex, children: _screens),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: Colors.white10, width: 0.5)),
+        ),
+        child: BottomNavigationBar(
+          backgroundColor: const Color(0xFF1E1E1E),
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: const Color(0xFFBB86FC),
+          unselectedItemColor: Colors.grey,
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          showUnselectedLabels: false,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_filled),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Journal'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.wechat_sharp),
+              label: 'Counselor',
+            ),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
       ),
     );
   }
 }
-

@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../data_models/journal_entry.dart';
+import '../data_models/user_model.dart'; // ✅ Pastikan import ini ada
 
 class DBHelper {
   static final DBHelper instance = DBHelper._init();
@@ -20,12 +21,28 @@ class DBHelper {
 
     return await openDatabase(
       path,
-      version: 4, // ⬅️ versi diperbarui
+      version: 5,
       onCreate: _createDB,
       onUpgrade: (db, oldVersion, newVersion) async {
-        // tambahkan kolom insight jika upgrade dari versi lama
         if (oldVersion < 4) {
-          await db.execute('ALTER TABLE journals ADD COLUMN insight TEXT');
+          // Cek kolom dulu (SQLite agak ribet utk cek kolom, tapi try-catch aman)
+          try {
+            await db.execute('ALTER TABLE journals ADD COLUMN insight TEXT');
+          } catch (e) {
+            // Kolom mungkin sudah ada, abaikan
+          }
+        }
+        if (oldVersion < 5) {
+          // 👇 GUNAKAN "IF NOT EXISTS" AGAR TIDAK CRASH JIKA TABEL SUDAH ADA
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT,
+              pin TEXT,
+              avatarEmoji TEXT,
+              bio TEXT
+            )
+          ''');
         }
       },
     );
@@ -33,7 +50,7 @@ class DBHelper {
 
   Future _createDB(Database db, int version) async {
     await db.execute('''
-      CREATE TABLE journals (
+      CREATE TABLE IF NOT EXISTS journals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT,
         content TEXT,
@@ -43,7 +60,21 @@ class DBHelper {
         insight TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        pin TEXT,
+        avatarEmoji TEXT,
+        bio TEXT
+      )
+    ''');
   }
+
+  // ==========================================
+  // 📝 BAGIAN JURNAL (JOURNAL ENTRY)
+  // ==========================================
 
   Future<int> insertJournal(JournalEntry entry) async {
     final db = await instance.database;
@@ -67,6 +98,7 @@ class DBHelper {
     return null;
   }
 
+  // ✅ Fungsi ini dikembalikan (fix error update)
   Future<int> updateJournal(JournalEntry entry) async {
     final db = await instance.database;
     return await db.update(
@@ -82,6 +114,12 @@ class DBHelper {
     return await db.delete('journals', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<int> deleteAllJournals() async {
+    final db = await instance.database;
+    return await db.delete('journals');
+  }
+
+  // ✅ Fungsi ini dikembalikan (fix error filter)
   Future<List<JournalEntry>> getJournalsByMood(String mood) async {
     final db = await instance.database;
     final result = await db.query(
@@ -92,22 +130,66 @@ class DBHelper {
     return result.map((e) => JournalEntry.fromMap(e)).toList();
   }
 
+  // ✅ Fungsi ini dikembalikan (FIX ERROR trends_screen.dart)
   Future<List<Map<String, dynamic>>> getWeeklyTrends() async {
     final db = await instance.database;
-    // Ambil 7 data terakhir, urutkan dari yang terlama ke terbaru untuk grafik
     final result = await db.query(
       'journals',
       columns: ['date', 'moodScore', 'mood'],
-      orderBy: 'date DESC', // Ambil terbaru dulu
+      orderBy: 'date DESC',
       limit: 7,
     );
-    return result.reversed
-        .toList(); // Balik urutan agar di grafik dari kiri (lama) ke kanan (baru)
+    return result.reversed.toList();
   }
 
-  // 👇 Tambahkan ini
-  Future<int> deleteAllJournals() async {
+  // ==========================================
+  // 👤 BAGIAN USER (AUTH & PROFILE)
+  // ==========================================
+
+  // Cek apakah sudah ada user terdaftar?
+  Future<bool> isUserRegistered() async {
     final db = await instance.database;
-    return await db.delete('journals');
+    final result = await db.query('users');
+    return result.isNotEmpty;
   }
+
+  // Register User Baru
+  Future<int> registerUser(User user) async {
+    final db = await instance.database;
+    // Hapus user lama jika ada (reset), karena aplikasi ini single user
+    await db.delete('users');
+    return await db.insert('users', user.toMap());
+  }
+
+  // Ambil Data User
+  Future<User?> getUser() async {
+    final db = await instance.database;
+    final result = await db.query('users', limit: 1);
+    if (result.isNotEmpty) {
+      return User.fromMap(result.first);
+    }
+    return null;
+  }
+
+  // Login (Cek PIN)
+  Future<bool> verifyPin(String inputPin) async {
+    final user = await getUser();
+    if (user != null) {
+      return user.pin == inputPin;
+    }
+    return false;
+  }
+
+  // Update Profile
+  Future<int> updateUser(User user) async {
+    final db = await instance.database;
+    return await db.update(
+      'users',
+      user.toMap(),
+      where: 'id = ?',
+      whereArgs: [user.id],
+    );
+  }
+
+  
 }

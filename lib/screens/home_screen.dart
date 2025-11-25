@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // ✅ Import untuk simpan nama
 import '../core/db_helper.dart';
 import '../network/ai_insight_service.dart';
 import 'add_journal_screen.dart';
 import 'journal_list_screen.dart';
 import 'trends_screen.dart';
 import 'counselor_screen.dart';
-import 'settings_screen.dart'; // ✅ Import halaman settings
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,14 +17,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String aiInspiration = "Loading inspiration...";
   String userMood = "Happy";
-  String userName = "Jovan"; // ✅ Variabel nama default
+  String userName = "Friend";
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadUserName(); // ✅ Load nama saat aplikasi dibuka
+    _loadUserName(); // ✅ Load nama dari Database
     _loadMoodAndAIQuote();
   }
 
@@ -40,17 +38,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadMoodAndAIQuote();
-      _loadUserName(); // Cek nama lagi siapa tahu berubah
+      _loadUserName();
     }
   }
 
-  // ✅ Fungsi baru untuk mengambil nama dari penyimpanan HP
+  // ✅ Update: Ambil nama dari Database (Bukan SharedPrefs) agar sinkron dengan Profile
   Future<void> _loadUserName() async {
-    final prefs = await SharedPreferences.getInstance();
+    final user = await DBHelper.instance.getUser();
     if (!mounted) return;
-    setState(() {
-      userName = prefs.getString('user_name') ?? "Jovan";
-    });
+    if (user != null) {
+      setState(() {
+        userName = user.name;
+      });
+    }
   }
 
   Future<void> _loadMoodAndAIQuote() async {
@@ -74,36 +74,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ✅ Agar AppBar transparan berada di atas background gradient
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          // ✅ Tombol Settings (Gear)
-          Container(
-            margin: const EdgeInsets.only(right: 16, top: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.settings, color: Colors.white),
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SettingsScreen(
-                      onThemeChanged: () {},
-                      onNameChanged: _loadUserName, // Update nama saat kembali
-                    ),
-                  ),
-                );
-                _loadUserName(); // Refresh paksa saat kembali
-              },
-            ),
-          ),
-        ],
+        // ❌ Tombol Gear/Settings SUDAH DIHAPUS
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -119,9 +94,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 👋 Greeting (Sekarang Dinamis!)
+                // 👋 Greeting
                 Text(
-                  "Hi, $userName 👋", // ✅ Menggunakan variabel userName
+                  "Hi, $userName 👋",
                   style: GoogleFonts.poppins(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
