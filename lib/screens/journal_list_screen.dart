@@ -14,12 +14,24 @@ class JournalListScreen extends StatefulWidget {
 }
 
 class _JournalListScreenState extends State<JournalListScreen> {
-  // Data
-  List<JournalEntry> _allJournals = [];
-  List<JournalEntry> _displayedJournals =
-      []; // Jurnal yang ditampilkan (terfilter tanggal/semua)
+  // Data Utama
+  List<JournalEntry> _allJournals = []; // Sumber data asli dari DB
+  List<JournalEntry> _filteredJournals = []; // Hasil filter untuk ditampilkan
+
   bool _isLoading = true;
-  bool _isCalendarView = false; // Toggle state
+  bool _isCalendarView = false;
+
+  // Search & Filter State
+  final TextEditingController _searchController = TextEditingController();
+  String _selectedMoodFilter = 'All'; // 'All', 'Happy', 'Sad', dll.
+  final List<String> _moodOptions = [
+    'All',
+    'Happy',
+    'Excited',
+    'Calm',
+    'Tired',
+    'Sad',
+  ];
 
   // Calendar State
   DateTime _focusedDay = DateTime.now();
@@ -33,22 +45,17 @@ class _JournalListScreenState extends State<JournalListScreen> {
     _loadJournals();
   }
 
-  // 1. Load Data dari DB dan Mapping untuk Kalender
+  // 1. Load Data
   Future<void> _loadJournals() async {
     setState(() => _isLoading = true);
     final list = await DBHelper.instance.getAllJournals();
 
-    // Mapping data untuk kalender: DateTime -> List<Journal>
+    // Mapping data untuk kalender
     Map<DateTime, List<JournalEntry>> events = {};
     for (var journal in list) {
-      // Parse tanggal string ke DateTime
       final date = DateTime.parse(journal.date);
-      // Normalisasi jam/menit/detik menjadi 00:00:00 agar bisa dikelompokkan per hari
       final dayKey = DateTime.utc(date.year, date.month, date.day);
-
-      if (events[dayKey] == null) {
-        events[dayKey] = [];
-      }
+      if (events[dayKey] == null) events[dayKey] = [];
       events[dayKey]!.add(journal);
     }
 
@@ -56,17 +63,41 @@ class _JournalListScreenState extends State<JournalListScreen> {
       _allJournals = list;
       _journalEvents = events;
       _isLoading = false;
-      // Default: Tampilkan semua di list view, atau filter by hari ini jika kalender view
-      _displayedJournals = _isCalendarView
-          ? _getJournalsForDay(_selectedDay!)
-          : list;
+      _applyFilter(); // Jalankan filter awal
     });
   }
 
-  List<JournalEntry> _getJournalsForDay(DateTime day) {
-    // Normalisasi tanggal yang dipilih user
-    final dayKey = DateTime.utc(day.year, day.month, day.day);
-    return _journalEvents[dayKey] ?? [];
+  // 2. Logika Inti: Filter & Search
+  void _applyFilter() {
+    List<JournalEntry> temp = _allJournals;
+
+    // A. Jika mode Kalender: Filter berdasarkan tanggal dulu
+    if (_isCalendarView && _selectedDay != null) {
+      final dayKey = DateTime.utc(
+        _selectedDay!.year,
+        _selectedDay!.month,
+        _selectedDay!.day,
+      );
+      temp = _journalEvents[dayKey] ?? [];
+    }
+
+    // B. Filter Mood (Jika bukan 'All')
+    if (_selectedMoodFilter != 'All') {
+      temp = temp.where((j) => j.mood == _selectedMoodFilter).toList();
+    }
+
+    // C. Search Text (Judul atau Konten)
+    String query = _searchController.text.toLowerCase().trim();
+    if (query.isNotEmpty) {
+      temp = temp.where((j) {
+        return j.title.toLowerCase().contains(query) ||
+            j.content.toLowerCase().contains(query);
+      }).toList();
+    }
+
+    setState(() {
+      _filteredJournals = temp;
+    });
   }
 
   String _getMoodEmoji(String mood) {
@@ -106,22 +137,19 @@ class _JournalListScreenState extends State<JournalListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: Text(_isCalendarView ? "Calendar View" : "My Journals"),
+        title: Text(_isCalendarView ? "Calendar" : "My Journals"),
         centerTitle: true,
         backgroundColor: const Color(0xFF1E1E1E),
+        elevation: 0,
         actions: [
-          // Tombol Toggle List/Calendar
           IconButton(
             icon: Icon(_isCalendarView ? Icons.list : Icons.calendar_month),
-            tooltip: _isCalendarView ? "Switch to List" : "Switch to Calendar",
             onPressed: () {
               setState(() {
                 _isCalendarView = !_isCalendarView;
-                // Reset list filter saat ganti mode
-                _displayedJournals = _isCalendarView
-                    ? _getJournalsForDay(_selectedDay!)
-                    : _allJournals;
+                _applyFilter(); // Re-apply filter saat ganti view
               });
             },
           ),
@@ -136,7 +164,7 @@ class _JournalListScreenState extends State<JournalListScreen> {
           );
           if (result == true) _loadJournals();
         },
-        icon: const Icon(Icons.add, color: Colors.black),
+        icon: const Icon(Icons.edit, color: Colors.black),
         label: const Text(
           "Write",
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
@@ -146,43 +174,21 @@ class _JournalListScreenState extends State<JournalListScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // 📅 AREA KALENDER (Hanya muncul jika mode kalender aktif)
-                if (_isCalendarView) _buildCalendar(),
+                // 📅 Bagian Kalender (Hanya muncul jika mode ON)
+                if (_isCalendarView) _buildCalendarSection(),
 
-                if (_isCalendarView)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8.0),
-                    child: Divider(thickness: 1, color: Colors.white24),
-                  ),
+                // 🔍 Bagian Search & Filter (Selalu muncul di List View, Optional di Calendar)
+                if (!_isCalendarView) _buildSearchAndFilterSection(),
 
-                // 📝 LIST JURNAL
+                // 📝 Daftar Jurnal
                 Expanded(
-                  child: _displayedJournals.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.book_outlined,
-                                size: 60,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _isCalendarView
-                                    ? "No entries for this date."
-                                    : "No journals yet.\nStart writing!",
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.poppins(color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        )
+                  child: _filteredJournals.isEmpty
+                      ? _buildEmptyState()
                       : ListView.builder(
                           padding: const EdgeInsets.all(16),
-                          itemCount: _displayedJournals.length,
+                          itemCount: _filteredJournals.length,
                           itemBuilder: (context, index) {
-                            return _buildJournalCard(_displayedJournals[index]);
+                            return _buildJournalCard(_filteredJournals[index]);
                           },
                         ),
                 ),
@@ -191,7 +197,73 @@ class _JournalListScreenState extends State<JournalListScreen> {
     );
   }
 
-  Widget _buildCalendar() {
+  // Widget Bagian Search & Chips
+  Widget _buildSearchAndFilterSection() {
+    return Container(
+      color: const Color(0xFF1E1E1E),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Search Bar
+          TextField(
+            controller: _searchController,
+            onChanged: (val) => _applyFilter(),
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: "Search title or content...",
+              hintStyle: const TextStyle(color: Colors.white54),
+              prefixIcon: const Icon(Icons.search, color: Colors.white54),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.05),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Filter Chips (Horizontal Scroll)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _moodOptions.map((mood) {
+                final isSelected = _selectedMoodFilter == mood;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(mood),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedMoodFilter = selected ? mood : 'All';
+                        _applyFilter();
+                      });
+                    },
+                    selectedColor: const Color(0xFFBB86FC),
+                    backgroundColor: Colors.white.withOpacity(0.1),
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.black : Colors.white70,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarSection() {
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -202,20 +274,17 @@ class _JournalListScreenState extends State<JournalListScreen> {
         firstDay: DateTime.utc(2020, 1, 1),
         lastDay: DateTime.utc(2030, 12, 31),
         focusedDay: _focusedDay,
-        calendarFormat: CalendarFormat.month,
+        calendarFormat: CalendarFormat
+            .month, // Pakai 2 weeks biar hemat tempat? Bisa ganti .month
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
         onDaySelected: (selectedDay, focusedDay) {
           setState(() {
             _selectedDay = selectedDay;
             _focusedDay = focusedDay;
-            // Filter list berdasarkan tanggal yg diklik
-            _displayedJournals = _getJournalsForDay(selectedDay);
+            _applyFilter(); // Filter list bawah
           });
         },
-        onPageChanged: (focusedDay) {
-          _focusedDay = focusedDay;
-        },
-        // Style Kalender
+        onPageChanged: (focusedDay) => _focusedDay = focusedDay,
         headerStyle: HeaderStyle(
           titleCentered: true,
           formatButtonVisible: false,
@@ -243,23 +312,21 @@ class _JournalListScreenState extends State<JournalListScreen> {
             shape: BoxShape.circle,
           ),
         ),
-        // Logika Marker (Titik-titik warna)
-        eventLoader: _getJournalsForDay,
+        eventLoader: (day) {
+          final dayKey = DateTime.utc(day.year, day.month, day.day);
+          return _journalEvents[dayKey] ?? [];
+        },
         calendarBuilders: CalendarBuilders(
           markerBuilder: (context, date, events) {
             if (events.isEmpty) return null;
-
-            // Ambil jurnal pertama di hari itu untuk menentukan warna dot
-            // (Bisa dikembangkan: jika ada banyak, tampilkan multi-dot)
             final journal = events.first as JournalEntry;
-
             return Positioned(
               bottom: 1,
               child: Container(
                 width: 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: _getMoodColor(journal.mood), // Warna sesuai mood!
+                  color: _getMoodColor(journal.mood),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -270,15 +337,45 @@ class _JournalListScreenState extends State<JournalListScreen> {
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search_off, size: 60, color: Colors.grey.withOpacity(0.5)),
+          const SizedBox(height: 16),
+          Text(
+            "No journals found.",
+            style: GoogleFonts.poppins(color: Colors.grey),
+          ),
+          if (_selectedMoodFilter != 'All' || _searchController.text.isNotEmpty)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _searchController.clear();
+                  _selectedMoodFilter = 'All';
+                  _applyFilter();
+                });
+              },
+              child: const Text(
+                "Clear Filters",
+                style: TextStyle(color: Color(0xFFBB86FC)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildJournalCard(JournalEntry j) {
     final formattedDate = j.date.split('T').first.replaceAll('-', '/');
-
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => JournalDetailScreen(entry: j)),
         );
+        _loadJournals(); // Refresh jika ada edit/delete nanti
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -286,23 +383,12 @@ class _JournalListScreenState extends State<JournalListScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFF1E1E1E),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: _getMoodColor(j.mood).withOpacity(0.3),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: _getMoodColor(j.mood).withOpacity(0.3)),
         ),
         child: Row(
           children: [
-            // Emoji Besar di Kiri
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: _getMoodColor(j.mood).withOpacity(0.1),
                 shape: BoxShape.circle,
@@ -313,7 +399,6 @@ class _JournalListScreenState extends State<JournalListScreen> {
               ),
             ),
             const SizedBox(width: 16),
-            // Konten
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,15 +408,14 @@ class _JournalListScreenState extends State<JournalListScreen> {
                     children: [
                       Text(
                         j.mood,
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                        style: TextStyle(
                           color: _getMoodColor(j.mood),
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         formattedDate,
-                        style: GoogleFonts.poppins(
+                        style: const TextStyle(
                           color: Colors.grey,
                           fontSize: 12,
                         ),
@@ -340,25 +424,23 @@ class _JournalListScreenState extends State<JournalListScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    j.title.isEmpty ? "No Title" : j.title,
-                    style: GoogleFonts.poppins(
+                    j.title,
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       color: Colors.white,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    j.content,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white70,
-                      fontSize: 13,
+                  if (j.content.isNotEmpty)
+                    Text(
+                      j.content,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 13,
+                      ),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
                 ],
               ),
             ),
