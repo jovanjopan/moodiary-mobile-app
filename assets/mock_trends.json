@@ -1,0 +1,9 @@
+[
+  { "day": "Mon", "mood": 3 },
+  { "day": "Tue", "mood": 4 },
+  { "day": "Wed", "mood": 5 },
+  { "day": "Thu", "mood": 2 },
+  { "day": "Fri", "mood": 4 },
+  { "day": "Sat", "mood": 3 },
+  { "day": "Sun", "mood": 5 }
+]

@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "date": "2025-10-01",
+    "mood": "Happy",
+    "note": "Had a productive day learning Flutter!",
+    "emoji": "😊"
+  },
+  {
+    "id": 2,
+    "date": "2025-10-03",
+    "mood": "Calm",
+    "note": "Enjoyed a peaceful walk at sunset.",
+    "emoji": "🌅"
+  },
+  {
+    "id": 3,
+    "date": "2025-10-07",
+    "mood": "Tired",
+    "note": "Too much work today, but still grateful.",
+    "emoji": "😴"
+  },
+  {
+    "id": 4,
+    "date": "2025-10-10",
+    "mood": "Excited",
+    "note": "Started building the Moodiary app!",
+    "emoji": "🚀"
+  }
+]
