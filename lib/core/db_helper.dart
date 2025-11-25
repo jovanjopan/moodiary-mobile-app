@@ -104,4 +104,10 @@ class DBHelper {
     return result.reversed
         .toList(); // Balik urutan agar di grafik dari kiri (lama) ke kanan (baru)
   }
+
+  // 👇 Tambahkan ini
+  Future<int> deleteAllJournals() async {
+    final db = await instance.database;
+    return await db.delete('journals');
+  }
 }

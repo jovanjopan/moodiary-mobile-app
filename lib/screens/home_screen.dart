@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // ✅ Import untuk simpan nama
 import '../core/db_helper.dart';
 import '../network/ai_insight_service.dart';
 import 'add_journal_screen.dart';
 import 'journal_list_screen.dart';
 import 'trends_screen.dart';
-import 'counselor_screen.dart'; // 👈 Wajib ada agar tombol Trends jalan
+import 'counselor_screen.dart';
+import 'settings_screen.dart'; // ✅ Import halaman settings
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,12 +19,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String aiInspiration = "Loading inspiration...";
   String userMood = "Happy";
+  String userName = "Jovan"; // ✅ Variabel nama default
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadUserName(); // ✅ Load nama saat aplikasi dibuka
     _loadMoodAndAIQuote();
   }
 
@@ -36,10 +40,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _loadMoodAndAIQuote();
+      _loadUserName(); // Cek nama lagi siapa tahu berubah
     }
   }
 
+  // ✅ Fungsi baru untuk mengambil nama dari penyimpanan HP
+  Future<void> _loadUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      userName = prefs.getString('user_name') ?? "Jovan";
+    });
+  }
+
   Future<void> _loadMoodAndAIQuote() async {
+    if (!mounted) return;
     setState(() => isLoading = true);
 
     final mood = await DBHelper.instance.getLastMood() ?? "Happy";
@@ -48,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       mood,
     );
 
+    if (!mounted) return;
     setState(() {
       userMood = mood;
       aiInspiration = aiResponse;
@@ -58,6 +74,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // ✅ Agar AppBar transparan berada di atas background gradient
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          // ✅ Tombol Settings (Gear)
+          Container(
+            margin: const EdgeInsets.only(right: 16, top: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.settings, color: Colors.white),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SettingsScreen(
+                      onThemeChanged: () {},
+                      onNameChanged: _loadUserName, // Update nama saat kembali
+                    ),
+                  ),
+                );
+                _loadUserName(); // Refresh paksa saat kembali
+              },
+            ),
+          ),
+        ],
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -72,9 +119,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 👋 Greeting
+                // 👋 Greeting (Sekarang Dinamis!)
                 Text(
-                  "Hi, Jovan 👋",
+                  "Hi, $userName 👋", // ✅ Menggunakan variabel userName
                   style: GoogleFonts.poppins(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
@@ -106,7 +153,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         title: "Log Mood",
                         subtitle: "How are you feeling?",
                         onTap: () async {
-                          // Tunggu user selesai input, lalu refresh quote
                           await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -138,7 +184,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         title: "Trends",
                         subtitle: "View your progress",
                         onTap: () {
-                          // ✅ Sekarang sudah mengarah ke TrendsScreen
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -147,7 +192,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           );
                         },
                       ),
-                      // Di dalam home_screen.dart
                       _buildCard(
                         color1: const Color(0xFFAD1457),
                         color2: const Color(0xFFD81B60),
@@ -155,7 +199,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         title: "Counselor",
                         subtitle: "Chat with AI",
                         onTap: () {
-                          // 👇 ARARHKAN KE SCREEN BARU
                           Navigator.push(
                             context,
                             MaterialPageRoute(
