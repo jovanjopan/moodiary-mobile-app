@@ -75,6 +75,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
+    await DBHelper.instance.clearAllData();
+    
+    // ✅ Check IMMEDIATELY after async operation
+    if (!mounted) return;
+    
+    // Only navigate if widget is still alive
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const MoodiaryApp()),
       (route) => false,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moodiary/data_models/user_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -42,14 +43,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _saveName() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_name', _nameController.text.trim());
+    // ❌ OLD CODE - DON'T USE SharedPreferences
+    // final prefs = await SharedPreferences.getInstance();
+    // await prefs.setString('user_name', _nameController.text.trim());
+    
+    // ✅ NEW CODE - Use Database instead
+    final currentUser = await DBHelper.instance.getUser();
+    
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Error: User not found")),
+        );
+      }
+      return;
+    }
+
+    // Create updated user with new name but keep other data intact
+    final updatedUser = User(
+      id: currentUser.id,
+      name: _nameController.text.trim(),
+      pin: currentUser.pin,           // Keep existing PIN
+      avatarEmoji: currentUser.avatarEmoji, // Keep existing avatar
+      bio: currentUser.bio,           // Keep existing bio
+    );
+
+    await DBHelper.instance.updateUser(updatedUser);
+    
     widget.onNameChanged(); // Beritahu Home screen untuk refresh
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Nama berhasil disimpan!")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Nama berhasil disimpan!")),
+      );
       FocusScope.of(context).unfocus(); // Tutup keyboard
     }
   }

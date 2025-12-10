@@ -191,5 +191,16 @@ class DBHelper {
     );
   }
 
-  
+  /// Clears ALL data from the app (users + journals)
+  /// Used for logout or reset functionality
+  Future<void> clearAllData() async {
+    final db = await instance.database;
+    
+    // Use transaction to ensure both deletes succeed or fail together
+    await db.transaction((txn) async {
+      await txn.delete('users');
+      await txn.delete('journals');
+    });
+  }
+
 }
