@@ -1,15 +1,53 @@
-# moodiary
+# Moodiary
 
-A new Flutter project.
+A privacy-first mood tracking app built with Flutter. Write daily journal entries, visualize your emotional trends, and maintain complete control over your personal data.
+
+## Features
+
+- **Secure Journaling**: Record daily entries with custom mood ratings and reflections
+- **Weekly Analytics**: Visual charts tracking your mood patterns over the last 7 days
+- **Privacy First**: Offline-first architecture with PIN protection—your data never leaves your device
+- **User Profile**: Customize your avatar and bio
+- **Data Control**: Full reset and logout functionality to manage your local data
+- **Easter Egg**: "Horror Mode" coming soon
+
+## Screenshots
+
+u can try it by urself :P
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### Prerequisites
+- Flutter SDK (latest stable version)
+- Dart SDK
 
-A few resources to get you started if this is your first Flutter project:
+### Installation
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd moodiary
+```
+
+2. Install dependencies:
+```bash
+flutter pub get
+```
+
+3. Run the app:
+```bash
+flutter run
+```
+
+## Tech Stack
+
+- **Flutter & Dart**: Cross-platform mobile development
+- **Sqflite**: Local SQLite database for offline storage
+- **Google Fonts**: Typography customization
+
+## Documentation
+
+For more information, visit the [Flutter documentation](https://docs.flutter.dev/).
 
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
