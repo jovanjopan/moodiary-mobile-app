@@ -6,6 +6,7 @@ import 'screens/counselor_screen.dart';
 import 'screens/profile_screen.dart';
 // import 'screens/trends_screen.dart';
 import 'screens/splash_screen.dart'; // ✅ Import Splash
+import 'screens/articles_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,7 +55,8 @@ class _MainPageState extends State<MainPage> {
     HomeScreen(),
     JournalListScreen(),
     CounselorScreen(),
-    ProfileScreen(),
+    ArticlesScreen(), // 👈 TAB BARU (Posisi ke-4)
+    ProfileScreen(),  // Profile geser ke posisi ke-5
   ];
 
   void _onItemTapped(int index) {
@@ -79,6 +81,7 @@ class _MainPageState extends State<MainPage> {
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           showUnselectedLabels: false,
+          // ... di dalam BottomNavigationBar items:
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.home_filled),
@@ -89,6 +92,12 @@ class _MainPageState extends State<MainPage> {
               icon: Icon(Icons.wechat_sharp),
               label: 'Counselor',
             ),
+            // 👇 TAB BARU
+            BottomNavigationBarItem(
+              icon: Icon(Icons.article_outlined),
+              label: 'News',
+            ),
+
             BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           ],
         ),

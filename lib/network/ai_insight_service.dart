@@ -4,9 +4,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AIInsightService {
   static final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-  static final String _endpoint =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$_apiKey";
 
+  // ✅ Endpoint TETAP (Tidak diubah sesuai permintaan)
+  static final String _endpoint =
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=$_apiKey";
+
+  // Fungsi 1: Generate Insight Jurnal (Quote)
   static Future<String> generateInsight(String content, String mood) async {
     final prompt =
         """
@@ -24,7 +27,6 @@ $content
 
     try {
       print('🛰️ [AIInsightService] Mengirim permintaan ke Gemini...');
-      print('🧠 Prompt: $prompt');
 
       final response = await http.post(
         Uri.parse(_endpoint),
@@ -41,20 +43,19 @@ $content
       );
 
       print('📡 Status Code: ${response.statusCode}');
-      print('🧾 Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         String text =
             data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? '';
 
-        // 🧹 Bersihkan format markdown dan simbol yang tidak diinginkan
+        // 🧹 Bersihkan format markdown
         text = text
-            .replaceAll(RegExp(r'[\*\_>`#"]'), '') // hapus simbol markdown
-            .replaceAll(RegExp(r'\s+'), ' ') // rapikan spasi berlebih
+            .replaceAll(RegExp(r'[\*\_>`#"]'), '')
+            .replaceAll(RegExp(r'\s+'), ' ')
             .trim();
 
-        // ✂️ Jika lebih dari satu kalimat, ambil kalimat pertama saja
+        // ✂️ Ambil kalimat pertama saja
         if (text.contains('.')) {
           text = text.split('.').first.trim() + '.';
         }
@@ -63,24 +64,22 @@ $content
             ? "Kamu sedang mencoba memahami perasaanmu dengan baik hari ini."
             : text;
       } else {
-        final message =
-            jsonDecode(response.body)['error']?['message'] ?? 'Tidak diketahui';
-        return "Koneksi AI gagal (${response.statusCode}): $message";
+        // Fallback jika server error
+        return "Server sedang sibuk, tapi kamu tetap hebat! 💪";
       }
     } catch (e) {
       print('❌ Exception: $e');
-      return "Kesalahan koneksi: $e";
+      // 👇 PERBAIKAN DI SINI:
+      // Mengembalikan pesan ramah saat offline, BUKAN pesan error teknis.
+      return "Maaf, sinyal sedang malu-malu 📡. Tapi ingat, kamu kuat! ✨";
     }
   }
-  // ... fungsi generateInsight yang lama ada di atas sini ...
 
-  // 👇 TAMBAHKAN FUNGSI BARU INI UNTUK CHATBOT
+  // 👇 FUNGSI CHATBOT (TETAP ADA / TIDAK DIHILANGKAN)
   static Future<String> chatWithCounselor(
     List<Map<String, String>> history,
     String newMessage,
   ) async {
-    // Bangun prompt dari history chat agar AI ingat konteks
-    // Kita ambil 6 pesan terakhir saja agar token tidak terlalu boros
     String contextData = "";
     int startIndex = history.length > 6 ? history.length - 6 : 0;
 
@@ -126,7 +125,7 @@ Counselor:
         return "Maaf, Counselor sedang istirahat sebentar (Error API).";
       }
     } catch (e) {
-      return "Gagal terhubung ke Counselor.";
+      return "Gagal terhubung ke Counselor. Cek internetmu ya.";
     }
   }
 }

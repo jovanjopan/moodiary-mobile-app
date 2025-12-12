@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../core/db_helper.dart';
 import '../data_models/user_model.dart';
 import '../main.dart'; // Untuk navigasi ke MainPage
+import '../core/demo_data_seeder.dart'; // ✅ Import file seeder
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -16,6 +17,8 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _pinController = TextEditingController();
+
+  bool _isLoading = false; // ✅ Untuk status loading saat generate demo
 
   // Pilihan Avatar Emoji
   final List<String> _emojis = [
@@ -55,7 +58,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!mounted) return;
 
-    // Pindah ke MainPage dan hapus history navigasi (agar tidak bisa back ke register)
+    // Pindah ke MainPage dan hapus history navigasi
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const MainPage()),
+      (route) => false,
+    );
+  }
+
+  // ✅ Fungsi untuk Setup Akun Demo
+  Future<void> _setupDemo() async {
+    setState(() => _isLoading = true);
+
+    // Panggil script seeding data
+    await DemoDataSeeder.seedDatabase();
+
+    if (!mounted) return;
+
+    // Langsung masuk ke Home
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const MainPage()),
       (route) => false,
@@ -199,7 +218,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Pinput(
                 controller: _pinController,
                 length: 4,
-                obscureText: true, // Sembunyikan angka jadi titik/bintang
+                obscureText: true,
                 defaultPinTheme: defaultPinTheme,
                 focusedPinTheme: defaultPinTheme.copyWith(
                   decoration: defaultPinTheme.decoration!.copyWith(
@@ -216,7 +235,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
               const SizedBox(height: 50),
 
-              // 5. Button
+              // 5. Button Register
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -238,6 +257,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
               ).animate().fadeIn(delay: 600.ms).moveY(begin: 20, end: 0),
+
+              const SizedBox(height: 20),
+
+              // 6. Tombol Demo Mode (Baru)
+              if (_isLoading)
+                const CircularProgressIndicator(color: Colors.white24)
+              else
+                TextButton(
+                  onPressed: _setupDemo,
+                  child: Text(
+                    "Or try Demo Account (Auto-fill Data)",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white38,
+                      fontSize: 12,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 800.ms),
             ],
           ),
         ),

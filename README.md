@@ -13,7 +13,7 @@ A privacy-first mood tracking app built with Flutter. Write daily journal entrie
 
 ## Screenshots
 
-TESTINGGGGG
+just try it by urself :P
 
 ## Getting Started
 

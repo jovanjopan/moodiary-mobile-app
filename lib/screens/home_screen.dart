@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // ✅ WAJIB ADA
 import '../core/db_helper.dart';
 import '../network/ai_insight_service.dart';
 import 'add_journal_screen.dart';
@@ -20,12 +21,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String userName = "Friend";
   bool isLoading = true;
 
+  // Kunci untuk SharedPreferences
+  static const String _lastFetchKey = 'last_ai_fetch_timestamp';
+  static const String _cachedQuoteKey = 'cached_ai_quote';
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadUserName(); // ✅ Load nama dari Database
-    _loadMoodAndAIQuote();
+    _loadUserName();
+    _loadMoodAndAIQuote(); // Load pertama kali
   }
 
   @override
@@ -37,12 +42,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // ✅ AMAN: Sekarang fungsi ini punya pengaman cooldown
       _loadMoodAndAIQuote();
       _loadUserName();
     }
   }
 
-  // ✅ Update: Ambil nama dari Database (Bukan SharedPrefs) agar sinkron dengan Profile
   Future<void> _loadUserName() async {
     final user = await DBHelper.instance.getUser();
     if (!mounted) return;
@@ -53,15 +58,57 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _loadMoodAndAIQuote() async {
+  // 🔥 LOGIC BARU: COOLDOWN SYSTEM
+  Future<void> _loadMoodAndAIQuote({bool forceUpdate = false}) async {
     if (!mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final lastFetch = prefs.getInt(_lastFetchKey) ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final cachedQuote = prefs.getString(_cachedQuoteKey);
+
+    // Dapatkan mood terakhir dari database
+    final mood = await DBHelper.instance.getLastMood() ?? "Happy";
+
+    // 🛑 CEK COOLDOWN
+    // Kalau tidak dipaksa update (forceUpdate == false)
+    // DAN belum 1 jam (3600000 ms) sejak request terakhir
+    // DAN kita punya quote simpanan di cache
+    if (!forceUpdate && (now - lastFetch < 3600000) && cachedQuote != null && cachedQuote.isNotEmpty) {
+      print("⏳ Masih cooldown. Menggunakan quote dari cache.");
+      setState(() {
+        userMood = mood;
+        aiInspiration = cachedQuote;
+        isLoading = false;
+      });
+      return; // Stop di sini, jangan panggil API
+    }
+
+    // Kalau lolos cek di atas, berarti waktunya fetch baru
     setState(() => isLoading = true);
 
-    final mood = await DBHelper.instance.getLastMood() ?? "Happy";
-    final aiResponse = await AIInsightService.generateInsight(
-      "Hari ini aku ingin termotivasi dan merasa lebih baik.",
-      mood,
-    );
+    String aiResponse;
+    try {
+      print("🚀 Fetching new AI Insight...");
+      aiResponse = await AIInsightService.generateInsight(
+        "Hari ini aku ingin termotivasi dan merasa lebih baik.",
+        mood,
+      );
+
+      // ✅ SIMPAN HASIL KE CACHE & UPDATE WAKTU
+      await prefs.setInt(_lastFetchKey, now);
+      await prefs.setString(_cachedQuoteKey, aiResponse);
+
+    } catch (e) {
+      print("❌ Error fetching AI: $e");
+      // Fallback message jika error
+      if (e.toString().contains("SocketException") ||
+          e.toString().contains("ClientException")) {
+        aiResponse = "Maaf, quote hari ini tidak bisa dimuat karena tidak ada internet 📡. Tapi tetap semangat ya! ✨";
+      } else {
+        aiResponse = "Sedang ada gangguan kecil, tapi kamu hebat! 💪";
+      }
+    }
 
     if (!mounted) return;
     setState(() {
@@ -78,7 +125,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // ❌ Tombol Gear/Settings SUDAH DIHAPUS
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -134,7 +180,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               builder: (_) => const AddJournalScreen(),
                             ),
                           );
-                          _loadMoodAndAIQuote();
+                          // ⚡ PAKSA UPDATE: Karena user baru aja input mood baru,
+                          // kita butuh insight baru yang relevan.
+                          _loadMoodAndAIQuote(forceUpdate: true);
                         },
                       ),
                       _buildCard(
